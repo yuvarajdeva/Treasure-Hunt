@@ -1,0 +1,154 @@
+Treasure Hunt
+
+Overview
+
+    The "Treasure Hunt" smart contract implements a simple on-chain game where multiple players can participate to find a hidden treasure on a 10x10 grid. The game's twist is that the treasure's location dynamically changes based on player interactions and predefined rules. The first player to move to the treasure's location wins the game and receives a portion of the contract's ETH balance.
+
+Prerequisites
+
+    Programming Language: Solidity (^0.8.0)
+
+    Blockchain: Ethereum
+
+Contract Details
+
+Contract Name
+
+    "TreasureHunt"
+
+State Variables
+
+    uint8 public constant GRID_SIZE: The size of the grid (10x10).
+    uint8 public constant TOTAL_POSITIONS: Total number of grid positions (GRID_SIZE \* GRID_SIZE = 100).
+    address public owner: The address of the contract owner (deployer).
+    uint8 public treasurePosition: The current position of the treasure on the grid.
+    mapping(address => uint8) public playerPositions: A mapping that stores each player's current position on the grid.
+    bool public gameEnded: A flag indicating whether the game has ended.
+
+Events
+
+    event MoveMade(address indexed player, uint8 newPosition): Emitted when a player makes a move.
+    event TreasureMoved(uint8 newTreasurePosition): Emitted when the treasure changes its position.
+    event Winner(address indexed winner, uint256 prize): Emitted when a player wins the game.
+
+Constructor
+
+    constructor() {
+        owner = msg.sender;
+        treasurePosition = uint8(uint256(keccak256(abi.encodePacked(block.number))) % TOTAL_POSITIONS);
+
+}
+Purpose: Initializes the contract by setting the owner and determining the initial treasure position using the hash of the block number at the time of deployment.
+
+Functions: 1. move(uint8 newPosition) external payable
+
+        Parameters:
+            uint8 newPosition: The new position the player wants to move to.
+
+        Modifiers:
+            external: Can be called externally.
+            payable: Requires a small amount of ETH to be sent with the transaction.
+
+        Requirements:
+            The game must not have ended.
+            The newPosition must be within the grid (0-99).
+            The player must move to an adjacent position.
+            The player must send some ETH.
+        Effects:
+            Updates the player's position.
+            Calls updateTreasurePosition to potentially move the treasure.
+            Checks if the player has found the treasure.
+            If the player wins, transfers 90% of the contract's balance to the player and ends the game.
+        Events:
+            Emits MoveMade.
+            Emits Winner if the player wins.
+    2. updateTreasurePosition(uint8 playerPosition) internal
+
+        Parameters:
+            uint8 playerPosition: The player's current position after the move.
+
+        Effects:
+            Moves the treasure to a random adjacent position if the player moves to a position that is a multiple of 5.
+            Moves the treasure to a completely random position if the player moves to a prime number.
+
+        Events:
+            Emits TreasureMoved if the treasure changes its position.
+
+    3. isAdjacent(uint8 position1, uint8 position2) internal pure returns (bool)
+
+        Parameters:
+            uint8 position1: The first position.
+            uint8 position2: The second position.
+
+        Returns:
+
+            bool: True if position2 is adjacent to position1, false otherwise.
+        Purpose: Determines if two positions on the grid are adjacent.
+
+    4. isPrime(uint8 number) internal pure returns (bool)
+
+        Parameters:
+            uint8 number: The number to check.
+
+        Returns:
+            bool: True if the number is prime, false otherwise.
+
+        Purpose: Checks if a number is prime.
+
+    5. getRandomPosition() internal view returns (uint8)
+
+        Returns:
+            uint8: A random position on the grid.
+
+        Purpose: Generates a random position on the grid using block timestamp and difficulty for randomness.
+
+    6. getRandomAdjacentPosition(uint8 position) internal view returns (uint8)
+
+        Parameters:
+            uint8 position: The current position of the treasure.
+
+        Returns:
+            uint8: A random adjacent position.
+
+        Purpose: Generates a random adjacent position on the grid from a given position.
+
+Testing
+The testing suite ensures that the contract's functions behave as expected under various scenarios. The tests include:
+
+        Deployment test to check the initial state.
+
+        Movement test to ensure players can move to valid positions.
+
+        Treasure movement tests based on the rules (multiples of 5 and prime numbers).
+
+        Winning condition test to verify that a player wins correctly.
+
+        Edge cases, such as attempting to move after the game has ended.
+
+Deployment
+To deploy the contract:
+
+Setup: Ensure you have the required environment with Hardhat, ethers.js, and Chai.
+Deploy Script:
+
+    task("deploy:TreasureHunt")
+    .addParam("signer", "Say hello, be nice")
+    .setAction(async function (taskArguments: TaskArguments, { ethers }) {
+        const signers: SignerWithAddress[] = await ethers.getSigners();
+        const treasureHuntFactory: TreasureHunt__factory = <TreasureHunt__factory>(
+        await ethers.getContractFactory("TreasureHunt")
+        );
+        const treasureHunt: TreasureHunt = <TreasureHunt>await treasureHuntFactory.connect(signers[0]).deploy();
+        await treasureHunt.deployed();
+        console.log("TreasureHunt deployed to: ", treasureHunt.address);
+    });
+
+    Run Tests: Use the Hardhat command npx hardhat test to run the test suite.
+
+Security Considerations
+
+    "Randomness": The randomness for treasure movement is derived from block timestamp and difficulty. While this is sufficient for a small-scale game, it may be vulnerable to manipulation in more competitive environments. For higher security, consider integrating Chainlink VRF or a similar oracle for verifiable randomness.
+
+    "Reentrancy": The contract does not have external calls other than sending ETH to the winner, which is safe as the game ends immediately after. However, it's good practice to implement reentrancy guards in more complex contracts.
+
+    "Overflow/Underflow": Solidity 0.8+ automatically checks for overflow and underflow, ensuring the safety of arithmetic operations.
